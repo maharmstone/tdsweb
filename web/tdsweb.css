@@ -35,6 +35,7 @@ body {
     width: 50vw;
     overflow: auto;
     margin-left: 0.5em;
+    font-family: 'Courier New', fixed;
 }
 
 #results {
@@ -43,4 +44,9 @@ body {
     overflow: auto;
     margin: 0.5em 0 0 0.5em;
     border-top: 0.1em solid #ccc;
+}
+
+.error {
+    font-weight: bold;
+    color: red;
 }

@@ -12,13 +12,10 @@ function change_status(msg, error) {
 
     status.appendChild(document.createTextNode(msg));
 
-    if (error) {
-        status.style.fontWeight = "bold";
-        status.style.color = "red";
-    } else {
-        status.style.fontWeight = "";
-        status.style.color = "";
-    }
+    if (error)
+        status.classList.add("error");
+    else
+        status.classList.remove("error");
 }
 
 function recv_login(msg) {
@@ -43,6 +40,35 @@ function recv_logout(msg) {
     logged_in = false;
 }
 
+function recv_message(msg) {
+    let log = document.getElementById("messages");
+    let s;
+
+    s = JSON.stringify(msg);
+
+    // FIXME - date and time?
+
+    if ((msg.msgno == 50000 || msg.msgno == 0) && msg.severity <= 10)
+        log.appendChild(document.createTextNode(msg.message));
+    else {
+        let span;
+
+        if (msg.severity > 10) {
+            span = document.createElement("span");
+            span.classList.add("error");
+
+            log.appendChild(span);
+        } else
+            span = log;
+
+        span.appendChild(document.createTextNode("Msg " + msg.msgno + ", Level " + msg.severity + ", State " + msg.state + ", Line " + msg.line_number));
+        span.appendChild(document.createElement("br"));
+        span.appendChild(document.createTextNode(msg.message));
+    }
+
+    log.appendChild(document.createElement("br"));
+}
+
 function message_received(ev) {
     try {
         let msg = JSON.parse(ev.data);
@@ -56,6 +82,8 @@ function message_received(ev) {
             recv_login(msg);
         else if (msg.type == "logout")
             recv_logout(msg);
+        else if (msg.type == "message")
+            recv_message(msg);
         else
             throw Error("Unrecognized message type " + msg.type + ".");
     } catch (e) {
