@@ -25,6 +25,8 @@ function recv_login(msg) {
     document.getElementById("password").disabled = true;
     document.getElementById("login-button").disabled = false;
     document.getElementById("login-button").setAttribute("value", "Logout");
+    document.getElementById("query-box").disabled = false;
+    document.getElementById("go-button").disabled = false;
 
     logged_in = true;
 }
@@ -36,6 +38,8 @@ function recv_logout(msg) {
     document.getElementById("password").disabled = false;
     document.getElementById("login-button").disabled = false;
     document.getElementById("login-button").setAttribute("value", "Login");
+    document.getElementById("query-box").disabled = true;
+    document.getElementById("go-button").disabled = false;
 
     logged_in = false;
 }
@@ -109,6 +113,9 @@ function socket_closed() {
     document.getElementById("username").disabled = true;
     document.getElementById("password").disabled = true;
     document.getElementById("login-button").disabled = true;
+    document.getElementById("login-button").setAttribute("value", "Login");
+    document.getElementById("query-box").disabled = true;
+    document.getElementById("go-button").disabled = true;
 
     setTimeout(function() {
         init_websocket();
@@ -129,6 +136,21 @@ function login_button_clicked() {
     }
 }
 
+function go_button_clicked() {
+    if (!logged_in)
+        return;
+
+    let q = document.getElementById("query-box").value;
+
+    if (q == "")
+        return;
+
+    ws.send(JSON.stringify({
+        "type": "query",
+        "query": q
+    }));
+}
+
 function init_websocket() {
     ws = new WebSocket("ws://localhost:52441/");
 
@@ -139,6 +161,11 @@ function init_websocket() {
 function init() {
     document.getElementById("login-form").addEventListener("submit", function(ev) {
         login_button_clicked();
+        ev.preventDefault();
+    });
+
+    document.getElementById("go-button").addEventListener("click", function(ev) {
+        go_button_clicked();
         ev.preventDefault();
     });
 
