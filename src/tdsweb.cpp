@@ -33,6 +33,8 @@ public:
 
     void login(const json& j);
     void logout();
+    void query(const json& j);
+
     void msg_handler(const string_view& server, const string_view& message, const string_view& proc_name,
          const string_view& sql_state, int32_t msgno, int32_t line_number, int16_t state, uint8_t priv_msg_type,
          uint8_t severity, int oserr);
@@ -77,6 +79,24 @@ void client::logout() {
     }.dump());
 }
 
+void client::query(const json& j) {
+    if (j.count("query") == 0)
+        throw runtime_error("No query given.");
+
+    if (!tds)
+        throw runtime_error("Not logged in.");
+
+    string q = j["query"];
+
+    // FIXME - what about question marks?
+
+    try {
+        tds->run(q);
+    } catch (...) {
+        // so we don't return "tds_submit_execute" failed to client
+    }
+}
+
 void client::msg_handler(const string_view& server, const string_view& message, const string_view& proc_name,
                          const string_view& sql_state, int32_t msgno, int32_t line_number, int16_t state, uint8_t priv_msg_type,
                          uint8_t severity, int oserr) {
@@ -110,6 +130,8 @@ static void ws_recv(ws::client_thread& ct, const string& msg) {
             c.login(j);
         else if (type == "logout")
             c.logout();
+        else if (type == "query")
+            c.query(j);
         else
             throw runtime_error("Unrecognized message type \"" + type + "\".");
     } catch (const exception& e) {
