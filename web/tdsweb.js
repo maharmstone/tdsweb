@@ -71,7 +71,11 @@ function recv_message(msg) {
         span.appendChild(document.createTextNode(msg.message));
     }
 
-    log.appendChild(document.createElement("br"));
+    let br = document.createElement("br");
+
+    log.appendChild(br);
+
+    br.scrollIntoView();
 }
 
 function recv_table(msg) {
