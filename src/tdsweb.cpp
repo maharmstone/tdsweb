@@ -33,6 +33,9 @@ public:
 
     void login(const json& j);
     void logout();
+    void msg_handler(const string_view& server, const string_view& message, const string_view& proc_name,
+         const string_view& sql_state, int32_t msgno, int32_t line_number, int16_t state, uint8_t priv_msg_type,
+         uint8_t severity, int oserr);
 
     ws::client_thread& ct;
     tds::Conn* tds = nullptr;
@@ -48,9 +51,10 @@ void client::login(const json& j) {
     if (tds)
         delete tds;
 
-    // FIXME - message handlers
+    auto mh = bind(&client::msg_handler, this, placeholders::_1, placeholders::_2, placeholders::_3, placeholders::_4,
+                   placeholders::_5, placeholders::_6, placeholders::_7, placeholders::_8, placeholders::_9, placeholders::_10);
 
-    tds = new tds::Conn(DB_SERVER, j["username"], j["password"], DB_APP);
+    tds = new tds::Conn(DB_SERVER, j["username"], j["password"], DB_APP, mh);
 
     ct.send(json{
         {"type", "login"},
@@ -65,6 +69,7 @@ void client::logout() {
         throw runtime_error("Can't logout as not logged in.");
 
     delete tds;
+    tds = nullptr;
 
     ct.send(json{
         {"type", "logout"},
@@ -72,7 +77,25 @@ void client::logout() {
     }.dump());
 }
 
-static void msg_handler(ws::client_thread& ct, const string& msg) {
+void client::msg_handler(const string_view& server, const string_view& message, const string_view& proc_name,
+                         const string_view& sql_state, int32_t msgno, int32_t line_number, int16_t state, uint8_t priv_msg_type,
+                         uint8_t severity, int oserr) {
+    ct.send(json{
+        {"type", "message"},
+        {"server", server},
+        {"message", message},
+        {"proc_name", proc_name},
+        {"sql_state", sql_state},
+        {"msgno", msgno},
+        {"line_number", line_number},
+        {"state", state},
+        {"priv_msg_type", priv_msg_type},
+        {"severity", severity},
+        {"oserr", oserr}
+    }.dump());
+}
+
+static void ws_recv(ws::client_thread& ct, const string& msg) {
     try {
         json j = json::parse(msg);
 
@@ -107,7 +130,7 @@ static void disconn_handler(ws::client_thread& ct) {
 }
 
 static void init() {
-    ws::server serv(PORT, BACKLOG, msg_handler, conn_handler, disconn_handler);
+    ws::server serv(PORT, BACKLOG, ws_recv, conn_handler, disconn_handler);
 
     serv.start();
 }
