@@ -38,6 +38,8 @@ public:
     void msg_handler(const string_view& server, const string_view& message, const string_view& proc_name,
          const string_view& sql_state, int32_t msgno, int32_t line_number, int16_t state, uint8_t priv_msg_type,
          uint8_t severity, int oserr);
+    void tbl_handler(const vector<pair<string, tds::server_type>>& columns);
+    void row_handler(const vector<tds::Field>& columns);
 
     ws::client_thread& ct;
     tds::Conn* tds = nullptr;
@@ -55,8 +57,10 @@ void client::login(const json& j) {
 
     auto mh = bind(&client::msg_handler, this, placeholders::_1, placeholders::_2, placeholders::_3, placeholders::_4,
                    placeholders::_5, placeholders::_6, placeholders::_7, placeholders::_8, placeholders::_9, placeholders::_10);
+    auto mh2 = bind(&client::tbl_handler, this, placeholders::_1);
+    auto mh3 = bind(&client::row_handler, this, placeholders::_1);
 
-    tds = new tds::Conn(DB_SERVER, j["username"], j["password"], DB_APP, mh);
+    tds = new tds::Conn(DB_SERVER, j["username"], j["password"], DB_APP, mh, nullptr, mh2, mh3);
 
     ct.send(json{
         {"type", "login"},
@@ -112,6 +116,38 @@ void client::msg_handler(const string_view& server, const string_view& message, 
         {"priv_msg_type", priv_msg_type},
         {"severity", severity},
         {"oserr", oserr}
+    }.dump());
+}
+
+void client::tbl_handler(const vector<pair<string, tds::server_type>>& columns) {
+    vector<json> ls;
+
+    for (const auto& col : columns) {
+        ls.emplace_back(json{
+            {"name", get<0>(col)},
+            {"type", get<1>(col)}
+        });
+    }
+
+    ct.send(json{
+        {"type", "table"},
+        {"columns", ls}
+    }.dump());
+}
+
+void client::row_handler(const vector<tds::Field>& columns) {
+    vector<json> ls;
+
+    for (const auto& col : columns) {
+        if (col.is_null())
+            ls.emplace_back(nullptr);
+        else
+            ls.emplace_back((string)col);
+    }
+
+    ct.send(json{
+        {"type", "row"},
+        {"columns", ls}
     }.dump());
 }
 
