@@ -1,6 +1,7 @@
 'use strict';
 
 let ws;
+let logged_in = false;
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -20,6 +21,28 @@ function change_status(msg, error) {
     }
 }
 
+function recv_login(msg) {
+    change_status("Logged in to " + msg.server + " as " + msg.username + ".", false);
+
+    document.getElementById("username").disabled = true;
+    document.getElementById("password").disabled = true;
+    document.getElementById("login-button").disabled = false;
+    document.getElementById("login-button").setAttribute("value", "Logout");
+
+    logged_in = true;
+}
+
+function recv_logout(msg) {
+    change_status("Logged out.", false);
+
+    document.getElementById("username").disabled = false;
+    document.getElementById("password").disabled = false;
+    document.getElementById("login-button").disabled = false;
+    document.getElementById("login-button").setAttribute("value", "Login");
+
+    logged_in = false;
+}
+
 function message_received(ev) {
     try {
         let msg = JSON.parse(ev.data);
@@ -29,6 +52,10 @@ function message_received(ev) {
 
         if (msg.type == "error")
             throw Error(msg.message);
+        else if (msg.type == "login")
+            recv_login(msg);
+        else if (msg.type == "logout")
+            recv_logout(msg);
         else
             throw Error("Unrecognized message type " + msg.type + ".");
     } catch (e) {
@@ -49,6 +76,8 @@ function socket_opened() {
 function socket_closed() {
     change_status("Disconnected.", true);
 
+    logged_in = false;
+
     document.getElementById("username").disabled = true;
     document.getElementById("password").disabled = true;
     document.getElementById("login-button").disabled = true;
@@ -57,12 +86,17 @@ function socket_closed() {
 }
 
 function login_button_clicked() {
-    ws.send(JSON.stringify({
-        "type": "login",
-        "username": document.getElementById("username").value,
-        "password": document.getElementById("password").value,
-    }));
-    // FIXME
+    if (!logged_in) {
+        ws.send(JSON.stringify({
+            "type": "login",
+            "username": document.getElementById("username").value,
+            "password": document.getElementById("password").value,
+        }));
+    } else {
+        ws.send(JSON.stringify({
+            "type": "logout"
+        }));
+    }
 }
 
 function init_websocket() {
