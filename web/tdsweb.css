@@ -56,3 +56,26 @@ body {
     font-weight: bold;
     color: red;
 }
+
+.null {
+    background-color: #fffbe7;
+    font-style: italic;
+}
+
+th {
+    text-align: left;
+    padding-right: 1em;
+}
+
+#results tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
+#results table {
+    border-collapse: collapse;
+    margin-bottom: 2em;
+}
+
+#results td {
+    padding: 0.25em;
+}

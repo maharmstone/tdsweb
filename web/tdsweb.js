@@ -2,6 +2,7 @@
 
 let ws;
 let logged_in = false;
+let res_tbody = null;
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -73,6 +74,56 @@ function recv_message(msg) {
     log.appendChild(document.createElement("br"));
 }
 
+function recv_table(msg) {
+    let tbl = document.createElement("table");
+    let col = msg.columns;
+
+    let thead = document.createElement("thead");
+
+    let tr = document.createElement("tr");
+
+    for (let i = 0; i < col.length; i++) {
+        let th = document.createElement("th");
+
+        if (col[i].name == "")
+            th.appendChild(document.createTextNode("(No column name)"));
+        else
+            th.appendChild(document.createTextNode(col[i].name));
+
+        tr.appendChild(th);
+    }
+
+    thead.appendChild(tr);
+    tbl.appendChild(thead);
+
+    let res = document.getElementById("results");
+
+    res_tbody = document.createElement("tbody");
+    tbl.appendChild(res_tbody);
+
+    res.appendChild(tbl);
+}
+
+function recv_row(msg) {
+    let col = msg.columns;
+
+    let tr = document.createElement("tr");
+
+    for (let i = 0; i < col.length; i++) {
+        let td = document.createElement("td");
+
+        if (col[i] === null) {
+            td.appendChild(document.createTextNode("NULL"));
+            td.classList.add("null");
+        } else
+            td.appendChild(document.createTextNode(col[i]));
+
+        tr.appendChild(td);
+    }
+
+    res_tbody.appendChild(tr);
+}
+
 function message_received(ev) {
     try {
         let msg = JSON.parse(ev.data);
@@ -88,6 +139,10 @@ function message_received(ev) {
             recv_logout(msg);
         else if (msg.type == "message")
             recv_message(msg);
+        else if (msg.type == "table")
+            recv_table(msg);
+        else if (msg.type == "row")
+            recv_row(msg);
         else
             throw Error("Unrecognized message type " + msg.type + ".");
     } catch (e) {
@@ -139,6 +194,12 @@ function login_button_clicked() {
 function go_button_clicked() {
     if (!logged_in)
         return;
+
+    let res = document.getElementById("results");
+
+    while (res.hasChildNodes()) {
+        res.removeChild(res.firstChild);
+    }
 
     let q = document.getElementById("query-box").value;
 
