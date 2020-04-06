@@ -110,7 +110,9 @@ function socket_closed() {
     document.getElementById("password").disabled = true;
     document.getElementById("login-button").disabled = true;
 
-    // FIXME - poll reconenct
+    setTimeout(function() {
+        init_websocket();
+    }, 5000);
 }
 
 function login_button_clicked() {
