@@ -32,6 +32,7 @@ public:
     }
 
     void login(const json& j);
+    void logout();
 
     ws::client_thread& ct;
     tds::Conn* tds = nullptr;
@@ -59,6 +60,18 @@ void client::login(const json& j) {
     }.dump());
 }
 
+void client::logout() {
+    if (!tds)
+        throw runtime_error("Can't logout as not logged in.");
+
+    delete tds;
+
+    ct.send(json{
+        {"type", "logout"},
+        {"success", true}
+    }.dump());
+}
+
 static void msg_handler(ws::client_thread& ct, const string& msg) {
     try {
         json j = json::parse(msg);
@@ -66,12 +79,14 @@ static void msg_handler(ws::client_thread& ct, const string& msg) {
         if (j.count("type") == 0)
             throw runtime_error("No message type given.");
 
-        auto c = (client*)ct.context;
+        auto& c = *(client*)ct.context;
 
         string type = j["type"];
 
         if (type == "login")
-            c->login(j);
+            c.login(j);
+        else if (type == "logout")
+            c.logout();
         else
             throw runtime_error("Unrecognized message type \"" + type + "\".");
     } catch (const exception& e) {
