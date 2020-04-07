@@ -28,6 +28,7 @@ function recv_login(msg) {
     document.getElementById("login-button").setAttribute("value", "Logout");
     document.getElementById("query-box").disabled = false;
     document.getElementById("go-button").disabled = false;
+    document.getElementById("stop-button").disabled = true;
 
     logged_in = true;
 }
@@ -40,7 +41,8 @@ function recv_logout(msg) {
     document.getElementById("login-button").disabled = false;
     document.getElementById("login-button").setAttribute("value", "Login");
     document.getElementById("query-box").disabled = true;
-    document.getElementById("go-button").disabled = false;
+    document.getElementById("go-button").disabled = true;
+    document.getElementById("stop-button").disabled = true;
 
     logged_in = false;
 }
@@ -141,6 +143,12 @@ function recv_row_count(msg) {
     p.scrollIntoView();
 }
 
+function recv_query_finished() {
+    document.getElementById("query-box").disabled = false;
+    document.getElementById("go-button").disabled = false;
+    document.getElementById("stop-button").disabled = true;
+}
+
 function message_received(ev) {
     try {
         let msg = JSON.parse(ev.data);
@@ -162,6 +170,8 @@ function message_received(ev) {
             recv_row(msg);
         else if (msg.type == "row_count")
             recv_row_count(msg);
+        else if (msg.type == "query_finished")
+            recv_query_finished();
         else
             throw Error("Unrecognized message type " + msg.type + ".");
     } catch (e) {
@@ -190,6 +200,7 @@ function socket_closed() {
     document.getElementById("login-button").setAttribute("value", "Login");
     document.getElementById("query-box").disabled = true;
     document.getElementById("go-button").disabled = true;
+    document.getElementById("stop-button").disabled = true;
 
     setTimeout(function() {
         init_websocket();
@@ -229,6 +240,19 @@ function go_button_clicked() {
         "type": "query",
         "query": q
     }));
+
+    document.getElementById("go-button").disabled = true;
+    document.getElementById("stop-button").disabled = false;
+    document.getElementById("query-box").disabled = true;
+}
+
+function stop_button_clicked() {
+    if (!logged_in)
+        return;
+
+    ws.send(JSON.stringify({
+        "type": "cancel"
+    }));
 }
 
 function init_websocket() {
@@ -246,6 +270,11 @@ function init() {
 
     document.getElementById("go-button").addEventListener("click", function(ev) {
         go_button_clicked();
+        ev.preventDefault();
+    });
+
+    document.getElementById("stop-button").addEventListener("click", function(ev) {
+        stop_button_clicked();
         ev.preventDefault();
     });
 
