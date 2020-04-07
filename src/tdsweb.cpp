@@ -40,6 +40,7 @@ public:
          uint8_t severity, int oserr);
     void tbl_handler(const vector<pair<string, tds::server_type>>& columns);
     void row_handler(const vector<tds::Field>& columns);
+    void row_count_handler(unsigned int count);
 
     ws::client_thread& ct;
     tds::Conn* tds = nullptr;
@@ -59,8 +60,9 @@ void client::login(const json& j) {
                    placeholders::_5, placeholders::_6, placeholders::_7, placeholders::_8, placeholders::_9, placeholders::_10);
     auto mh2 = bind(&client::tbl_handler, this, placeholders::_1);
     auto mh3 = bind(&client::row_handler, this, placeholders::_1);
+    auto mh4 = bind(&client::row_count_handler, this, placeholders::_1);
 
-    tds = new tds::Conn(DB_SERVER, j["username"], j["password"], DB_APP, mh, nullptr, mh2, mh3);
+    tds = new tds::Conn(DB_SERVER, j["username"], j["password"], DB_APP, mh, nullptr, mh2, mh3, mh4);
 
     ct.send(json{
         {"type", "login"},
@@ -148,6 +150,13 @@ void client::row_handler(const vector<tds::Field>& columns) {
     ct.send(json{
         {"type", "row"},
         {"columns", ls}
+    }.dump());
+}
+
+void client::row_count_handler(unsigned int count) {
+    ct.send(json{
+        {"type", "row_count"},
+        {"count", count}
     }.dump());
 }
 
