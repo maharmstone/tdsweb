@@ -2,6 +2,7 @@
 #include <wscpp.h>
 #include <string>
 #include <iostream>
+#include <thread>
 #include <stdint.h>
 #include <nlohmann/json.hpp>
 
@@ -27,6 +28,11 @@ public:
     client(ws::client_thread& ct) : ct(ct) { }
 
     ~client() {
+        if (query_thread) {
+            query_thread->join();
+            delete query_thread;
+        }
+
         if (tds)
             delete tds;
     }
@@ -34,6 +40,7 @@ public:
     void login(const json& j);
     void logout();
     void query(const json& j);
+    void cancel();
 
     void msg_handler(const string_view& server, const string_view& message, const string_view& proc_name,
          const string_view& sql_state, int32_t msgno, int32_t line_number, int16_t state, uint8_t priv_msg_type,
@@ -44,6 +51,7 @@ public:
 
     ws::client_thread& ct;
     tds::Conn* tds = nullptr;
+    thread* query_thread = nullptr;
 };
 
 void client::login(const json& j) {
@@ -92,15 +100,27 @@ void client::query(const json& j) {
     if (!tds)
         throw runtime_error("Not logged in.");
 
-    string q = j["query"];
+    if (query_thread)
+        throw runtime_error("Query already running.");
 
-    // FIXME - what about question marks?
+    query_thread = new thread([&](string q) {
+        // FIXME - what about question marks?
 
-    try {
-        tds->run(q);
-    } catch (...) {
-        // so we don't return "tds_submit_execute" failed to client
-    }
+        try {
+            tds->run(q);
+        } catch (...) {
+            // so we don't return "tds_submit_execute" failed to client
+        }
+
+        ct.send(json{
+            {"type", "query_finished"}
+        }.dump());
+
+        query_thread->detach();
+
+        delete query_thread;
+        query_thread = nullptr;
+    }, j["query"]);
 }
 
 void client::msg_handler(const string_view& server, const string_view& message, const string_view& proc_name,
@@ -160,6 +180,11 @@ void client::row_count_handler(unsigned int count) {
     }.dump());
 }
 
+void client::cancel() {
+    if (tds)
+        tds->cancel();
+}
+
 static void ws_recv(ws::client_thread& ct, const string& msg) {
     try {
         json j = json::parse(msg);
@@ -177,6 +202,8 @@ static void ws_recv(ws::client_thread& ct, const string& msg) {
             c.logout();
         else if (type == "query")
             c.query(j);
+        else if (type == "cancel")
+            c.cancel();
         else
             throw runtime_error("Unrecognized message type \"" + type + "\".");
     } catch (const exception& e) {

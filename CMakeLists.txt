@@ -1,11 +1,12 @@
 cmake_minimum_required(VERSION 3.14.6)
 
-find_package(nlohmann_json 3.2.0 REQUIRED)
-
 project(tdsweb)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_package(nlohmann_json 3.2.0 REQUIRED)
+find_package(Threads)
 
 set(SRC_FILES src/tdsweb.cpp)
 
@@ -15,6 +16,7 @@ set_property(TARGET tdsweb PROPERTY
 
 target_link_libraries(tdsweb wscpp)
 target_link_libraries(tdsweb tdscpp)
+target_link_libraries(tdsweb Threads::Threads)
 
 if(MSVC)
     target_compile_options(tdsweb PRIVATE /W4)
