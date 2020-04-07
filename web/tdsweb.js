@@ -53,29 +53,22 @@ function recv_message(msg) {
 
     // FIXME - date and time?
 
+    let p = document.createElement("p");
+
     if ((msg.msgno == 50000 || msg.msgno == 0) && msg.severity <= 10)
-        log.appendChild(document.createTextNode(msg.message));
+        p.appendChild(document.createTextNode(msg.message));
     else {
-        let span;
+        if (msg.severity > 10)
+            p.classList.add("error");
 
-        if (msg.severity > 10) {
-            span = document.createElement("span");
-            span.classList.add("error");
-
-            log.appendChild(span);
-        } else
-            span = log;
-
-        span.appendChild(document.createTextNode("Msg " + msg.msgno + ", Level " + msg.severity + ", State " + msg.state + ", Line " + msg.line_number));
-        span.appendChild(document.createElement("br"));
-        span.appendChild(document.createTextNode(msg.message));
+        p.appendChild(document.createTextNode("Msg " + msg.msgno + ", Level " + msg.severity + ", State " + msg.state + ", Line " + msg.line_number));
+        p.appendChild(document.createElement("br"));
+        p.appendChild(document.createTextNode(msg.message));
     }
 
-    let br = document.createElement("br");
+    log.appendChild(p);
 
-    log.appendChild(br);
-
-    br.scrollIntoView();
+    p.scrollIntoView();
 }
 
 function recv_table(msg) {
@@ -128,6 +121,26 @@ function recv_row(msg) {
     res_tbody.appendChild(tr);
 }
 
+function recv_row_count(msg) {
+    let log = document.getElementById("messages");
+    let s;
+
+    s = JSON.stringify(msg);
+
+    // FIXME - date and time?
+
+    let p = document.createElement("p");
+
+    if (msg.count == 1)
+        p.appendChild(document.createTextNode("(1 row affected)"));
+    else
+        p.appendChild(document.createTextNode("(" + msg.count + " rows affected)"));
+
+    log.appendChild(p);
+
+    p.scrollIntoView();
+}
+
 function message_received(ev) {
     try {
         let msg = JSON.parse(ev.data);
@@ -147,6 +160,8 @@ function message_received(ev) {
             recv_table(msg);
         else if (msg.type == "row")
             recv_row(msg);
+        else if (msg.type == "row_count")
+            recv_row_count(msg);
         else
             throw Error("Unrecognized message type " + msg.type + ".");
     } catch (e) {
