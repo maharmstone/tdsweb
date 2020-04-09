@@ -1,7 +1,7 @@
 'use strict';
 
 let ws;
-let logged_in = false;
+let logged_in = false, logging_in = false;
 let res_tbody = null;
 
 document.addEventListener("DOMContentLoaded", init);
@@ -20,6 +20,8 @@ function change_status(msg, error) {
 }
 
 function recv_login(msg) {
+    logging_in = false;
+
     change_status("Logged in to " + msg.server + " as " + msg.username + ".", false);
 
     document.getElementById("username").disabled = true;
@@ -156,9 +158,14 @@ function message_received(ev) {
         if (msg.type == undefined)
             throw Error("No message type given.");
 
-        if (msg.type == "error")
+        if (msg.type == "error") {
+            if (logging_in) {
+                logging_in = false;
+                document.getElementById("login-button").disabled = false;
+            }
+
             throw Error(msg.message);
-        else if (msg.type == "login")
+        } else if (msg.type == "login")
             recv_login(msg);
         else if (msg.type == "logout")
             recv_logout(msg);
@@ -193,6 +200,7 @@ function socket_closed() {
     change_status("Disconnected.", true);
 
     logged_in = false;
+    logging_in = false;
 
     document.getElementById("username").disabled = true;
     document.getElementById("password").disabled = true;
@@ -209,6 +217,11 @@ function socket_closed() {
 
 function login_button_clicked() {
     if (!logged_in) {
+        logging_in = true;
+
+        document.getElementById("login-button").disabled = true;
+        change_status("Logging in...", false);
+
         ws.send(JSON.stringify({
             "type": "login",
             "username": document.getElementById("username").value,
