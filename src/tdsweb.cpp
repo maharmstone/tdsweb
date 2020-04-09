@@ -41,6 +41,7 @@ public:
     void logout();
     void query(const json& j);
     void cancel();
+    void change_database(const json& j);
 
     void msg_handler(const string_view& server, const string_view& message, const string_view& proc_name,
          const string_view& sql_state, int32_t msgno, int32_t line_number, int16_t state, uint8_t priv_msg_type,
@@ -207,6 +208,18 @@ void client::cancel() {
         tds->cancel();
 }
 
+void client::change_database(const json& j) {
+    if (!tds)
+        throw runtime_error("Not logged in.");
+
+    if (j.count("database") == 0)
+        throw runtime_error("No database given.");
+
+    string db = j["database"];
+
+    tds->run("USE " + tds::escape(db));
+}
+
 static void ws_recv(ws::client_thread& ct, const string& msg) {
     try {
         json j = json::parse(msg);
@@ -226,6 +239,8 @@ static void ws_recv(ws::client_thread& ct, const string& msg) {
             c.query(j);
         else if (type == "cancel")
             c.cancel();
+        else if (type == "change_database")
+            c.change_database(j);
         else
             throw runtime_error("Unrecognized message type \"" + type + "\".");
     } catch (const exception& e) {
