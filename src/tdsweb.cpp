@@ -121,20 +121,29 @@ void client::query(const json& j) {
         throw runtime_error("Query already running.");
 
     query_thread = new thread([&](string q) {
+        bool failed = false;
+
         shared_ptr<tds::Conn> tds2 = tds;
 
         // FIXME - what about question marks?
 
         try {
-            tds2->run(q);
-        } catch (...) {
-            // so we don't return "tds_submit_execute failed" to client
-        }
+            try {
+                tds2->run(q);
+            } catch (...) {
+                // swallow exception, so we don't return "tds_submit_execute failed" to client
+                failed = true;
+            }
 
-        if (tds == tds2) { // don't send if stopping because logged out
-            ct.send(json{
-                {"type", "query_finished"}
-            }.dump());
+            if (failed && tds2->is_dead())
+                logout();
+            else if (!failed || tds == tds2) { // don't send if stopping because logged out
+                ct.send(json{
+                    {"type", "query_finished"}
+                }.dump());
+            }
+        } catch (const exception& e) {
+            send_error(ct, e.what());
         }
 
         query_thread->detach();
