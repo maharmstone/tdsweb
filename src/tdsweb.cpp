@@ -9,7 +9,6 @@
 using namespace std;
 using json = nlohmann::json;
 
-static const uint16_t PORT = 52441; // FIXME - move to command line?
 static const string DB_APP = "tdsweb";
 static const unsigned int BACKLOG = 10;
 
@@ -256,8 +255,8 @@ static void disconn_handler(ws::client_thread& ct) {
     }
 }
 
-static void init(const string& server) {
-    ws::server serv(PORT, BACKLOG, ws_recv, [&](ws::client_thread& ct) {
+static void init(const string& server, uint16_t port) {
+    ws::server serv(port, BACKLOG, ws_recv, [&](ws::client_thread& ct) {
         ct.context = new client(ct, server);
     }, disconn_handler);
 
@@ -266,12 +265,17 @@ static void init(const string& server) {
 
 int main(int argc, char* argv[]) {
     try {
-        if (argc < 2) {
-            fprintf(stderr, "Usage: tdsweb server\n");
+        if (argc < 3) {
+            fprintf(stderr, "Usage: tdsweb server port\n");
             return 1;
         }
 
-        init(argv[1]);
+        auto port = stoul(argv[2]);
+
+        if (port > 0xffff)
+            throw runtime_error("Port out of range.");
+
+        init(argv[1], port);
     } catch (const exception& e) {
         cerr << e.what() << endl;
         return 1;
