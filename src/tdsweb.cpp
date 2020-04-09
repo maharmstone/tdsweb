@@ -72,11 +72,33 @@ void client::login(const json& j) {
 
     tds = new tds::Conn(DB_SERVER, j["username"], j["password"], DB_APP, mh, nullptr, mh2, mh3, mh4);
 
+    string cur_db;
+
+    {
+        tds::Query sq(*tds, "SELECT DB_NAME()");
+
+        sq.fetch_row();
+
+        cur_db = sq[0];
+    }
+
+    vector<json> dbs;
+
+    {
+        tds::Query sq(*tds, "SELECT name FROM sys.databases ORDER BY name");
+
+        while (sq.fetch_row()) {
+            dbs.push_back(sq[0]);
+        }
+    }
+
     ct.send(json{
         {"type", "login"},
         {"success", true},
         {"server", DB_SERVER},
-        {"username", j["username"]}
+        {"username", j["username"]},
+        {"database", cur_db},
+        {"databases", dbs}
     }.dump());
 }
 
