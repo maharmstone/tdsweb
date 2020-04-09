@@ -9,9 +9,8 @@
 using namespace std;
 using json = nlohmann::json;
 
-static const string DB_SERVER = "luthien"; // FIXME - move to command line
-static const string DB_APP = "tdsweb";
 static const uint16_t PORT = 52441; // FIXME - move to command line?
+static const string DB_APP = "tdsweb";
 static const unsigned int BACKLOG = 10;
 
 static void send_error(ws::client_thread& ct, const string& msg) {
@@ -25,7 +24,7 @@ static void send_error(ws::client_thread& ct, const string& msg) {
 
 class client {
 public:
-    client(ws::client_thread& ct) : ct(ct) { }
+    client(ws::client_thread& ct, const string& server) : ct(ct), server(server) { }
 
     ~client() {
         if (query_thread) {
@@ -51,6 +50,7 @@ public:
     void row_count_handler(unsigned int count);
 
     ws::client_thread& ct;
+    string server;
     tds::Conn* tds = nullptr;
     thread* query_thread = nullptr;
 };
@@ -71,7 +71,7 @@ void client::login(const json& j) {
     auto mh3 = bind(&client::row_handler, this, placeholders::_1);
     auto mh4 = bind(&client::row_count_handler, this, placeholders::_1);
 
-    tds = new tds::Conn(DB_SERVER, j["username"], j["password"], DB_APP, mh, nullptr, mh2, mh3, mh4);
+    tds = new tds::Conn(server, j["username"], j["password"], DB_APP, mh, nullptr, mh2, mh3, mh4);
 
     string cur_db;
 
@@ -96,7 +96,7 @@ void client::login(const json& j) {
     ct.send(json{
         {"type", "login"},
         {"success", true},
-        {"server", DB_SERVER},
+        {"server", server},
         {"username", j["username"]},
         {"database", cur_db},
         {"databases", dbs}
@@ -248,10 +248,6 @@ static void ws_recv(ws::client_thread& ct, const string& msg) {
     }
 }
 
-static void conn_handler(ws::client_thread& ct) {
-    ct.context = new client(ct);
-}
-
 static void disconn_handler(ws::client_thread& ct) {
     if (ct.context) {
         auto c = (client*)ct.context;
@@ -260,15 +256,22 @@ static void disconn_handler(ws::client_thread& ct) {
     }
 }
 
-static void init() {
-    ws::server serv(PORT, BACKLOG, ws_recv, conn_handler, disconn_handler);
+static void init(const string& server) {
+    ws::server serv(PORT, BACKLOG, ws_recv, [&](ws::client_thread& ct) {
+        ct.context = new client(ct, server);
+    }, disconn_handler);
 
     serv.start();
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     try {
-        init();
+        if (argc < 2) {
+            fprintf(stderr, "Usage: tdsweb server\n");
+            return 1;
+        }
+
+        init(argv[1]);
     } catch (const exception& e) {
         cerr << e.what() << endl;
         return 1;
