@@ -14,7 +14,7 @@
 <label for="password">Password:</label> <input type="password" id="password" disabled="disabled" />
 <input type="submit" id="login-button" value="Login" disabled="disabled" />
 </form>
-<span id="status">Not connected.</span>
+<span id="status">Connecting...</span>
 </div>
 
 <div id="horiz-bit">
@@ -24,6 +24,12 @@
 <div id="query-buttons">
 <button disabled="disabled" style="color: green" id="go-button">▶</button>
 <button disabled="disabled" style="color: red" id="stop-button">■</button>
+
+<span id="database-changer-container" style="display: none">
+<label for="database-changer">Database:</label>
+<select id="database-changer"></select>
+</span>
+
 </div>
 
 <textarea readonly="readonly" id="query-box"></textarea>

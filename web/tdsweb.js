@@ -32,6 +32,24 @@ function recv_login(msg) {
     document.getElementById("go-button").disabled = false;
     document.getElementById("stop-button").disabled = true;
 
+    let dbc = document.getElementById("database-changer");
+
+    while (dbc.hasChildNodes()) {
+        dbc.removeChild(dbc.firstChild);
+    }
+
+    for (let i = 0; i < msg.databases.length; i++) {
+        let opt = document.createElement("option");
+        opt.appendChild(document.createTextNode(msg.databases[i]));
+
+        if (msg.databases[i] == msg.database)
+            opt.setAttribute("selected", "selected");
+
+        dbc.appendChild(opt);
+    }
+
+    document.getElementById("database-changer-container").style.display = "";
+
     logged_in = true;
 }
 
@@ -45,6 +63,7 @@ function recv_logout(msg) {
     document.getElementById("query-box").readOnly = true;
     document.getElementById("go-button").disabled = true;
     document.getElementById("stop-button").disabled = true;
+    document.getElementById("database-changer-container").style.display = "none";
 
     logged_in = false;
 }
@@ -149,6 +168,7 @@ function recv_query_finished() {
     document.getElementById("query-box").readOnly = false;
     document.getElementById("go-button").disabled = false;
     document.getElementById("stop-button").disabled = true;
+    document.getElementById("database-changer").disabled = false;
 }
 
 function message_received(ev) {
@@ -209,6 +229,7 @@ function socket_closed() {
     document.getElementById("query-box").readOnly = true;
     document.getElementById("go-button").disabled = true;
     document.getElementById("stop-button").disabled = true;
+    document.getElementById("database-changer-container").style.display = "none";
 
     setTimeout(function() {
         init_websocket();
@@ -257,6 +278,7 @@ function go_button_clicked() {
     document.getElementById("go-button").disabled = true;
     document.getElementById("stop-button").disabled = false;
     document.getElementById("query-box").readOnly = true;
+    document.getElementById("database-changer").disabled = true;
 }
 
 function stop_button_clicked() {
