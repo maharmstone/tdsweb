@@ -30,9 +30,6 @@ public:
             query_thread->join();
             delete query_thread;
         }
-
-        if (tds)
-            delete tds;
     }
 
     void login(const json& j);
@@ -50,7 +47,7 @@ public:
 
     ws::client_thread& ct;
     string server;
-    tds::Conn* tds = nullptr;
+    shared_ptr<tds::Conn> tds;
     thread* query_thread = nullptr;
 };
 
@@ -61,16 +58,13 @@ void client::login(const json& j) {
     if (j.count("password") == 0)
         throw runtime_error("Password not provided.");
 
-    if (tds)
-        delete tds;
-
     auto mh = bind(&client::msg_handler, this, placeholders::_1, placeholders::_2, placeholders::_3, placeholders::_4,
                    placeholders::_5, placeholders::_6, placeholders::_7, placeholders::_8, placeholders::_9, placeholders::_10);
     auto mh2 = bind(&client::tbl_handler, this, placeholders::_1);
     auto mh3 = bind(&client::row_handler, this, placeholders::_1);
     auto mh4 = bind(&client::row_count_handler, this, placeholders::_1);
 
-    tds = new tds::Conn(server, j["username"], j["password"], DB_APP, mh, nullptr, mh2, mh3, mh4);
+    tds.reset(new tds::Conn(server, j["username"], j["password"], DB_APP, mh, nullptr, mh2, mh3, mh4));
 
     string cur_db;
 
@@ -106,8 +100,9 @@ void client::logout() {
     if (!tds)
         throw runtime_error("Can't logout as not logged in.");
 
-    delete tds;
-    tds = nullptr;
+    tds->cancel();
+
+    tds.reset();
 
     ct.send(json{
         {"type", "logout"},
@@ -126,17 +121,21 @@ void client::query(const json& j) {
         throw runtime_error("Query already running.");
 
     query_thread = new thread([&](string q) {
+        shared_ptr<tds::Conn> tds2 = tds;
+
         // FIXME - what about question marks?
 
         try {
-            tds->run(q);
+            tds2->run(q);
         } catch (...) {
-            // so we don't return "tds_submit_execute" failed to client
+            // so we don't return "tds_submit_execute failed" to client
         }
 
-        ct.send(json{
-            {"type", "query_finished"}
-        }.dump());
+        if (tds == tds2) { // don't send if stopping because logged out
+            ct.send(json{
+                {"type", "query_finished"}
+            }.dump());
+        }
 
         query_thread->detach();
 
