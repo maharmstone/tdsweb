@@ -28,7 +28,7 @@ function recv_login(msg) {
     document.getElementById("password").disabled = true;
     document.getElementById("login-button").disabled = false;
     document.getElementById("login-button").setAttribute("value", "Logout");
-    document.getElementById("query-box").disabled = false;
+    document.getElementById("query-box").readOnly = false;
     document.getElementById("go-button").disabled = false;
     document.getElementById("stop-button").disabled = true;
 
@@ -42,7 +42,7 @@ function recv_logout(msg) {
     document.getElementById("password").disabled = false;
     document.getElementById("login-button").disabled = false;
     document.getElementById("login-button").setAttribute("value", "Login");
-    document.getElementById("query-box").disabled = true;
+    document.getElementById("query-box").readOnly = true;
     document.getElementById("go-button").disabled = true;
     document.getElementById("stop-button").disabled = true;
 
@@ -146,7 +146,7 @@ function recv_row_count(msg) {
 }
 
 function recv_query_finished() {
-    document.getElementById("query-box").disabled = false;
+    document.getElementById("query-box").readOnly = false;
     document.getElementById("go-button").disabled = false;
     document.getElementById("stop-button").disabled = true;
 }
@@ -206,7 +206,7 @@ function socket_closed() {
     document.getElementById("password").disabled = true;
     document.getElementById("login-button").disabled = true;
     document.getElementById("login-button").setAttribute("value", "Login");
-    document.getElementById("query-box").disabled = true;
+    document.getElementById("query-box").readOnly = true;
     document.getElementById("go-button").disabled = true;
     document.getElementById("stop-button").disabled = true;
 
@@ -256,7 +256,7 @@ function go_button_clicked() {
 
     document.getElementById("go-button").disabled = true;
     document.getElementById("stop-button").disabled = false;
-    document.getElementById("query-box").disabled = true;
+    document.getElementById("query-box").readOnly = true;
 }
 
 function stop_button_clicked() {
