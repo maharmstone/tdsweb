@@ -290,6 +290,16 @@ function stop_button_clicked() {
     }));
 }
 
+function database_changed() {
+    if (!logged_in)
+        return;
+
+    ws.send(JSON.stringify({
+        "type": "change_database",
+        "database": document.getElementById("database-changer").value
+    }));
+}
+
 function init_websocket() {
     ws = new WebSocket("ws://localhost:52441/");
 
@@ -313,7 +323,9 @@ function init() {
         ev.preventDefault();
     });
 
-    init_websocket();
+    document.getElementById("database-changer").addEventListener("change", function(ev) {
+        database_changed();
+    });
 
-    // FIXME - reconnect if goes down
+    init_websocket();
 }
