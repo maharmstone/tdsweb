@@ -301,7 +301,7 @@ function database_changed() {
 }
 
 function init_websocket() {
-    ws = new WebSocket("ws://localhost:52441/");
+    ws = new WebSocket((location.protocol == "https:" ? "wss" : "ws") + "://" + location.host + "/ws");
 
     ws.addEventListener("open", socket_opened);
     ws.addEventListener("close", socket_closed);
