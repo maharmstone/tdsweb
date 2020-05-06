@@ -219,6 +219,8 @@ function socket_opened() {
 function socket_closed() {
     change_status("Disconnected.", true);
 
+    ws = undefined;
+
     logged_in = false;
     logging_in = false;
 
@@ -300,11 +302,23 @@ function database_changed() {
     }));
 }
 
+function ws_ping() {
+    if (typeof ws != "undefined") {
+        ws.send(JSON.stringify({
+            "type": "ping"
+        }));
+    }
+
+    window.setTimeout(ws_ping, 15000);
+}
+
 function init_websocket() {
     ws = new WebSocket((location.protocol == "https:" ? "wss" : "ws") + "://" + location.host + "/ws");
 
     ws.addEventListener("open", socket_opened);
     ws.addEventListener("close", socket_closed);
+
+    window.setTimeout(ws_ping, 15000);
 }
 
 function init() {
