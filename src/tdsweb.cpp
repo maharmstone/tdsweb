@@ -50,6 +50,7 @@ public:
     string server;
     shared_ptr<tds::Conn> tds;
     thread* query_thread = nullptr;
+    bool cancelled = false;
 };
 
 void client::login(const json& j) {
@@ -126,6 +127,8 @@ void client::query(const json& j) {
 
         shared_ptr<tds::Conn> tds2 = tds;
 
+        cancelled = false;
+
         // FIXME - what about question marks?
 
         try {
@@ -175,6 +178,9 @@ void client::msg_handler(const string_view& server, const string_view& message, 
 void client::tbl_handler(const vector<pair<string, tds::server_type>>& columns) {
     vector<json> ls;
 
+    if (cancelled)
+        return;
+
     for (const auto& col : columns) {
         ls.emplace_back(json{
             {"name", get<0>(col)},
@@ -190,6 +196,9 @@ void client::tbl_handler(const vector<pair<string, tds::server_type>>& columns) 
 
 void client::row_handler(const vector<tds::Field>& columns) {
     vector<json> ls;
+
+    if (cancelled)
+        return;
 
     for (const auto& col : columns) {
         if (col.is_null())
@@ -212,8 +221,10 @@ void client::row_count_handler(unsigned int count) {
 }
 
 void client::cancel() {
-    if (tds)
+    if (tds) {
+        cancelled = true;
         tds->cancel();
+    }
 }
 
 void client::change_database(const json& j) {
