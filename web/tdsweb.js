@@ -199,7 +199,9 @@ function message_received(ev) {
             recv_row_count(msg);
         else if (msg.type == "query_finished")
             recv_query_finished();
-        else
+        else if (msg.type == "pong") {
+            // nop
+        } else
             throw Error("Unrecognized message type " + msg.type + ".");
     } catch (e) {
         change_status(e.message, true);
