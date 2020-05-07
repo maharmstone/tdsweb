@@ -37,6 +37,7 @@ public:
     void query(const json& j);
     void cancel();
     void change_database(const json& j);
+    void ping();
 
     void msg_handler(const string_view& server, const string_view& message, const string_view& proc_name,
          const string_view& sql_state, int32_t msgno, int32_t line_number, int16_t state, uint8_t priv_msg_type,
@@ -227,6 +228,12 @@ void client::change_database(const json& j) {
     tds->run("USE " + tds::escape(db));
 }
 
+void client::ping() {
+    ct.send(json{
+        {"type", "pong"}
+    }.dump());
+}
+
 static void ws_recv(ws::client_thread& ct, const string& msg) {
     try {
         json j = json::parse(msg);
@@ -248,6 +255,8 @@ static void ws_recv(ws::client_thread& ct, const string& msg) {
             c.cancel();
         else if (type == "change_database")
             c.change_database(j);
+        else if (type == "ping")
+            c.ping();
         else
             throw runtime_error("Unrecognized message type \"" + type + "\".");
     } catch (const exception& e) {
