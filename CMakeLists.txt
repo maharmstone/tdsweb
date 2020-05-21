@@ -16,6 +16,7 @@ set_property(TARGET tdsweb PROPERTY
 
 target_link_libraries(tdsweb wscpp)
 target_link_libraries(tdsweb tdscpp)
+target_link_libraries(tdsweb xlcpp)
 target_link_libraries(tdsweb Threads::Threads)
 
 if(MSVC)

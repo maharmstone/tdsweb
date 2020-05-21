@@ -31,6 +31,7 @@ function recv_login(msg) {
     document.getElementById("query-box").readOnly = false;
     document.getElementById("go-button").disabled = false;
     document.getElementById("stop-button").disabled = true;
+    document.getElementById("excel-button").disabled = false;
 
     let dbc = document.getElementById("database-changer");
 
@@ -63,6 +64,7 @@ function recv_logout(msg) {
     document.getElementById("query-box").readOnly = true;
     document.getElementById("go-button").disabled = true;
     document.getElementById("stop-button").disabled = true;
+    document.getElementById("excel-button").disabled = true;
     document.getElementById("database-changer-container").style.display = "none";
 
     logged_in = false;
@@ -168,6 +170,7 @@ function recv_query_finished() {
     document.getElementById("query-box").readOnly = false;
     document.getElementById("go-button").disabled = false;
     document.getElementById("stop-button").disabled = true;
+    document.getElementById("excel-button").disabled = false;
     document.getElementById("database-changer").disabled = false;
 }
 
@@ -233,6 +236,7 @@ function socket_closed() {
     document.getElementById("query-box").readOnly = true;
     document.getElementById("go-button").disabled = true;
     document.getElementById("stop-button").disabled = true;
+    document.getElementById("excel-button").disabled = true;
     document.getElementById("database-changer-container").style.display = "none";
 
     setTimeout(function() {
@@ -259,7 +263,7 @@ function login_button_clicked() {
     }
 }
 
-function go_button_clicked() {
+function go_button_clicked(excel) {
     if (!logged_in)
         return;
 
@@ -274,13 +278,22 @@ function go_button_clicked() {
     if (q == "")
         return;
 
-    ws.send(JSON.stringify({
-        "type": "query",
-        "query": q
-    }));
+    if (excel) {
+        ws.send(JSON.stringify({
+            "type": "query",
+            "query": q,
+            "export": "excel"
+        }));
+    } else {
+        ws.send(JSON.stringify({
+            "type": "query",
+            "query": q
+        }));
+    }
 
     document.getElementById("go-button").disabled = true;
     document.getElementById("stop-button").disabled = false;
+    document.getElementById("excel-button").disabled = true;
     document.getElementById("query-box").readOnly = true;
     document.getElementById("database-changer").disabled = true;
 }
@@ -330,12 +343,17 @@ function init() {
     });
 
     document.getElementById("go-button").addEventListener("click", function(ev) {
-        go_button_clicked();
+        go_button_clicked(false);
         ev.preventDefault();
     });
 
     document.getElementById("stop-button").addEventListener("click", function(ev) {
         stop_button_clicked();
+        ev.preventDefault();
+    });
+
+    document.getElementById("excel-button").addEventListener("click", function(ev) {
+        go_button_clicked(true);
         ev.preventDefault();
     });
 

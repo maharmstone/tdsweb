@@ -5,6 +5,7 @@
 #include <thread>
 #include <stdint.h>
 #include <nlohmann/json.hpp>
+#include <xlcpp.h>
 
 using namespace std;
 using json = nlohmann::json;
@@ -51,6 +52,8 @@ public:
     shared_ptr<tds::Conn> tds;
     thread* query_thread = nullptr;
     bool cancelled = false;
+    unique_ptr<xlcpp::workbook> excel;
+    xlcpp::sheet* sheet;
 };
 
 void client::login(const json& j) {
@@ -122,6 +125,11 @@ void client::query(const json& j) {
     if (query_thread)
         throw runtime_error("Query already running.");
 
+    if (j.count("export") > 0 && j.at("export") == "excel") {
+        excel.reset(new xlcpp::workbook());
+        sheet = &excel->add_sheet("Sheet1");
+    }
+
     query_thread = new thread([&](string q) {
         bool failed = false;
 
@@ -142,9 +150,20 @@ void client::query(const json& j) {
             if (failed && tds2->is_dead())
                 logout();
             else if (!failed || tds == tds2) { // don't send if stopping because logged out
-                ct.send(json{
-                    {"type", "query_finished"}
-                }.dump());
+                if (excel) {
+                    ct.send(json{
+                        {"type", "query_finished"},
+                        {"mime", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+                        {"filename", "results.xlsx"},
+                        {"data", excel->data()}
+                    }.dump());
+
+                    excel.reset(nullptr);
+                } else {
+                    ct.send(json{
+                        {"type", "query_finished"}
+                    }.dump());
+                }
             }
         } catch (const exception& e) {
             send_error(ct, e.what());
@@ -154,7 +173,7 @@ void client::query(const json& j) {
 
         delete query_thread;
         query_thread = nullptr;
-    }, j["query"]);
+    }, j.at("query"));
 }
 
 void client::msg_handler(const string_view& server, const string_view& message, const string_view& proc_name,
@@ -181,17 +200,28 @@ void client::tbl_handler(const vector<pair<string, tds::server_type>>& columns) 
     if (cancelled)
         return;
 
-    for (const auto& col : columns) {
-        ls.emplace_back(json{
-            {"name", get<0>(col)},
-            {"type", get<1>(col)}
-        });
-    }
+    if (excel) {
+        // FIXME - add blank row if not first table
+        // FIXME - make header bold
 
-    ct.send(json{
-        {"type", "table"},
-        {"columns", ls}
-    }.dump());
+        auto& row = sheet->add_row();
+
+        for (const auto& col : columns) {
+            row.add_cell(get<0>(col));
+        }
+    } else {
+        for (const auto& col : columns) {
+            ls.emplace_back(json{
+                {"name", get<0>(col)},
+                {"type", get<1>(col)}
+            });
+        }
+
+        ct.send(json{
+            {"type", "table"},
+            {"columns", ls}
+        }.dump());
+    }
 }
 
 void client::row_handler(const vector<tds::Field>& columns) {
@@ -200,17 +230,28 @@ void client::row_handler(const vector<tds::Field>& columns) {
     if (cancelled)
         return;
 
-    for (const auto& col : columns) {
-        if (col.is_null())
-            ls.emplace_back(nullptr);
-        else
-            ls.emplace_back((string)col);
-    }
+    if (excel) {
+        auto& row = sheet->add_row();
 
-    ct.send(json{
-        {"type", "row"},
-        {"columns", ls}
-    }.dump());
+        for (const auto& col : columns) {
+            if (col.is_null())
+                row.add_cell("NULL"); // FIXME - make italic?
+            else
+                row.add_cell((string)col); // FIXME - numbers, dates, times, datetimes
+        }
+    } else {
+        for (const auto& col : columns) {
+            if (col.is_null())
+                ls.emplace_back(nullptr);
+            else
+                ls.emplace_back((string)col);
+        }
+
+        ct.send(json{
+            {"type", "row"},
+            {"columns", ls}
+        }.dump());
+    }
 }
 
 void client::row_count_handler(unsigned int count) {
