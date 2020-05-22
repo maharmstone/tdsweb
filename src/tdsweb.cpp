@@ -254,8 +254,16 @@ void client::row_handler(const vector<tds::Field>& columns) {
                         break;
                     }
 
+                    case tds::server_type::SYBMSDATE:
+                    {
+                        auto d = (tds::Date)col;
+
+                        row.add_cell(xlcpp::date{d.year(), d.month(), d.day()});
+                        break;
+                    }
+
                     default:
-                        row.add_cell((string)col); // FIXME - dates (SYBMSDATE), times (SYBMSTIME), floats
+                        row.add_cell((string)col); // FIXME - times (SYBMSTIME), floats
                 }
             }
         }
