@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <nlohmann/json.hpp>
 #include <xlcpp.h>
+#include "base64.h"
 
 using namespace std;
 using json = nlohmann::json;
@@ -155,7 +156,7 @@ void client::query(const json& j) {
                         {"type", "query_finished"},
                         {"mime", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
                         {"filename", "results.xlsx"},
-                        {"data", excel->data()}
+                        {"data", base64_encode(excel->data())}
                     }.dump());
 
                     excel.reset(nullptr);
