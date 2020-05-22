@@ -247,6 +247,7 @@ void client::row_handler(const vector<tds::Field>& columns) {
                     break;
 
                     case tds::server_type::SYBDATETIME:
+                    case tds::server_type::SYBDATETIMN:
                     {
                         auto dt = (tds::DateTime)col;
 
