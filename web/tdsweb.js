@@ -166,12 +166,22 @@ function recv_row_count(msg) {
     p.scrollIntoView();
 }
 
-function recv_query_finished() {
+function recv_query_finished(msg) {
     document.getElementById("query-box").readOnly = false;
     document.getElementById("go-button").disabled = false;
     document.getElementById("stop-button").disabled = true;
     document.getElementById("excel-button").disabled = false;
     document.getElementById("database-changer").disabled = false;
+
+    if (msg.data != undefined) {
+        let link = document.createElement("a");
+
+        link.href = "data:" + msg.mime + ";base64," + msg.data;
+        link.download = msg.filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
 }
 
 function message_received(ev) {
@@ -201,7 +211,7 @@ function message_received(ev) {
         else if (msg.type == "row_count")
             recv_row_count(msg);
         else if (msg.type == "query_finished")
-            recv_query_finished();
+            recv_query_finished(msg);
         else if (msg.type == "pong") {
             // nop
         } else
