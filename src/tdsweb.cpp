@@ -262,8 +262,16 @@ void client::row_handler(const vector<tds::Field>& columns) {
                         break;
                     }
 
+                    case tds::server_type::SYBMSTIME:
+                    {
+                        auto t = (tds::Time)col;
+
+                        row.add_cell(xlcpp::time{t.h, t.m, t.s});
+                        break;
+                    }
+
                     default:
-                        row.add_cell((string)col); // FIXME - times (SYBMSTIME), floats
+                        row.add_cell((string)col); // FIXME - floats
                 }
             }
         }
