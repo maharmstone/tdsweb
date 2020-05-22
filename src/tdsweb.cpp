@@ -277,6 +277,11 @@ void client::row_handler(const vector<tds::Field>& columns) {
                         row.add_cell((double)col);
                     break;
 
+                    case tds::server_type::SYBBIT:
+                    case tds::server_type::SYBBITN:
+                        row.add_cell((int)col != 0);
+                    break;
+
                     default:
                         row.add_cell((string)col);
                 }
