@@ -237,8 +237,19 @@ void client::row_handler(const vector<tds::Field>& columns) {
         for (const auto& col : columns) {
             if (col.is_null())
                 row.add_cell("NULL"); // FIXME - make italic?
-            else
-                row.add_cell((string)col); // FIXME - numbers, dates, times, datetimes
+            else {
+                switch (col.type) {
+                    case tds::server_type::SYBINTN:
+                    case tds::server_type::SYBINT1:
+                    case tds::server_type::SYBINT2:
+                    case tds::server_type::SYBINT4:
+                        row.add_cell((int64_t)col);
+                    break;
+
+                    default:
+                        row.add_cell((string)col); // FIXME - dates, times, datetimes
+                }
+            }
         }
     } else {
         for (const auto& col : columns) {
