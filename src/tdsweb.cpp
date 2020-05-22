@@ -271,8 +271,14 @@ void client::row_handler(const vector<tds::Field>& columns) {
                         break;
                     }
 
+                    case tds::server_type::SYBFLT8:
+                    case tds::server_type::SYBFLTN:
+                    case tds::server_type::SYBREAL:
+                        row.add_cell((double)col);
+                    break;
+
                     default:
-                        row.add_cell((string)col); // FIXME - floats
+                        row.add_cell((string)col);
                 }
             }
         }
