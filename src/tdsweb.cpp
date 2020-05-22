@@ -203,12 +203,12 @@ void client::tbl_handler(const vector<pair<string, tds::server_type>>& columns) 
 
     if (excel) {
         // FIXME - add blank row if not first table
-        // FIXME - make header bold
 
         auto& row = sheet->add_row();
 
         for (const auto& col : columns) {
-            row.add_cell(get<0>(col));
+            auto& c = row.add_cell(get<0>(col));
+            c.set_font("Arial", 10, true);
         }
     } else {
         for (const auto& col : columns) {
