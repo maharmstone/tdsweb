@@ -33,7 +33,7 @@ body {
     resize: none;
 }
 
-#query button {
+#go-button, #stop-button {
     width: 3em;
 }
 
