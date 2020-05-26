@@ -6,7 +6,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(nlohmann_json 3.2.0 REQUIRED)
-find_package(Threads)
+find_package(Threads REQUIRED)
+find_package(tdscpp REQUIRED)
 
 set(SRC_FILES src/tdsweb.cpp)
 
