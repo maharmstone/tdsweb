@@ -21,11 +21,15 @@ using json = nlohmann::json;
 static const string DB_APP = "tdsweb";
 static const unsigned int BACKLOG = 10;
 
+unique_ptr<ws::server> wsserv;
+
 #ifdef _WIN32
+#include <winsvc.h>
 // in win.cpp
 void service_install();
 void service_uninstall();
 void service();
+void set_status(unsigned long state);
 #endif
 
 static void send_error(ws::client_thread& ct, const string& msg) {
@@ -386,12 +390,23 @@ static void disconn_handler(ws::client_thread& ct) {
     }
 }
 
-static void init(const string& server, uint16_t port, bool service = false) {
-    ws::server serv(port, BACKLOG, ws_recv, [&](ws::client_thread& ct) {
+#ifdef _WIN32
+void init(const string& server, uint16_t port, bool service = false) {
+#else
+void init(const string& server, uint16_t port) {
+#endif
+    wsserv.reset(new ws::server(port, BACKLOG, ws_recv, [&](ws::client_thread& ct) {
         ct.context = new client(ct, server);
-    }, disconn_handler);
+    }, disconn_handler));
 
-    serv.start();
+#ifdef _WIN32
+    if (service)
+        set_status(SERVICE_RUNNING);
+#endif
+
+    wsserv->start();
+
+    wsserv.reset(nullptr);
 }
 
 int main(int argc, char* argv[]) {

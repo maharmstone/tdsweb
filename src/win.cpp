@@ -1,14 +1,43 @@
 #ifdef _WIN32
 
+#define _WIN32_WINNT 0x0600
+
 #include <string>
 #include <stdexcept>
 #include <array>
+#include <memory>
+#include <wscpp.h>
 #include <windows.h>
 
 using namespace std;
 
 #define SERVICE_NAME L"TDSweb"
 SERVICE_STATUS_HANDLE service_handle = nullptr;
+
+// int tdsweb.cpp
+extern unique_ptr<ws::server> wsserv;
+void init(const string& server, uint16_t port, bool service = false);
+
+class registry_not_found : public exception {
+public:
+    const char* what() const noexcept {
+        return "Registry key not found.";
+    }
+};
+
+class hkey {
+public:
+    hkey(HKEY hkey, const string_view& subkey, REGSAM sam_desired);
+    ~hkey();
+    string query_string_value(const string_view& name) const;
+    uint32_t query_dword_value(const string_view& name) const;
+    void create_key(const string_view& name);
+    void set_string_value(const string_view& name, const string_view& value);
+    void delete_tree(const string_view& name);
+
+private:
+    HKEY k;
+};
 
 static __inline u16string utf8_to_utf16(const string_view& s) {
     u16string ret;
@@ -53,6 +82,97 @@ static __inline string utf16_to_utf8(const u16string_view& s) {
 
     return ret;
 }
+
+hkey::hkey(HKEY hkey, const string_view& subkey, REGSAM sam_desired) {
+    auto subkeyw = utf8_to_utf16(subkey);
+
+    auto ret = RegOpenKeyExW(hkey, (LPCWSTR)subkeyw.c_str(), 0, sam_desired, &k);
+    if (ret == ERROR_FILE_NOT_FOUND)
+        throw registry_not_found();
+    else if (ret != ERROR_SUCCESS)
+        throw runtime_error("RegOpenKeyEx returned error " + to_string(ret) + ".");
+}
+
+hkey::~hkey() {
+    RegCloseKey(k);
+}
+
+string hkey::query_string_value(const string_view& name) const {
+    auto namew = utf8_to_utf16(name);
+    DWORD type, len;
+    ULONG buf_size = 1024;
+    u16string buf;
+    LSTATUS ret;
+
+    do {
+        buf.resize(buf_size);
+
+        len = buf_size;
+        ret = RegQueryValueExW(k, (LPCWSTR)namew.c_str(), nullptr, &type, (BYTE*)const_cast<char16_t*>(buf.c_str()), &len);
+
+        if (ret == ERROR_FILE_NOT_FOUND)
+            throw registry_not_found();
+        else if (ret != ERROR_SUCCESS && ret != ERROR_MORE_DATA)
+            throw runtime_error("RegQueryValueExW returned error " + to_string(ret) + ".");
+
+        if (type != REG_SZ)
+            throw runtime_error("Registry value type was " + to_string(type) + ", not REG_SZ as expected.");
+
+        buf_size *= 2;
+    } while (ret == ERROR_MORE_DATA);
+
+    string s = utf16_to_utf8(buf.substr(0, len / sizeof(WCHAR)));
+
+    if (!s.empty() && s.back() == 0)
+        s.pop_back();
+
+    return s;
+}
+
+uint32_t hkey::query_dword_value(const string_view& name) const {
+    auto namew = utf8_to_utf16(name);
+    DWORD type, len, val;
+
+    auto ret = RegQueryValueExW(k, (LPCWSTR)namew.c_str(), nullptr, &type, (LPBYTE)&val, &len);
+
+    if (ret == ERROR_FILE_NOT_FOUND)
+        throw registry_not_found();
+    else if (ret != ERROR_SUCCESS)
+        throw runtime_error("RegQueryValueExW returned error " + to_string(ret) + ".");
+
+    if (type != REG_SZ)
+        throw runtime_error("Registry value type was " + to_string(type) + ", not REG_SZ as expected.");
+
+    return val;
+}
+
+void hkey::create_key(const string_view& name) {
+    auto namew = utf8_to_utf16(name);
+    HKEY k2;
+    DWORD dispos;
+
+    auto ret = RegCreateKeyExW(k, (LPCWSTR)namew.c_str(), 0, nullptr, 0, KEY_WRITE, nullptr, &k2, &dispos);
+    if (ret != ERROR_SUCCESS)
+        throw runtime_error("RegCreateKeyEx returned error " + to_string(ret) + ".");
+}
+
+void hkey::set_string_value(const string_view& name, const string_view& value) {
+    auto namew = utf8_to_utf16(name);
+    auto valuew = utf8_to_utf16(value);
+
+    auto ret = RegSetKeyValueW(k, nullptr, (LPCWSTR)namew.c_str(), REG_SZ, valuew.c_str(), ((DWORD)valuew.size() + 1) * sizeof(WCHAR));
+    if (ret != ERROR_SUCCESS)
+        throw runtime_error("RegSetKeyValueEx returned error " + to_string(ret) + ".");
+}
+
+void hkey::delete_tree(const std::string_view& name) {
+    auto namew = utf8_to_utf16(name);
+
+    auto ret = RegDeleteTreeW(k, (LPCWSTR)namew.c_str());
+    if (ret != ERROR_SUCCESS)
+        throw runtime_error("RegDeleteTree returned error " + to_string(ret) + ".");
+}
+
 
 void event_log(const string_view& msg, unsigned short type) {
     HANDLE event_source = RegisterEventSourceW(nullptr, SERVICE_NAME);
@@ -189,7 +309,7 @@ void service_uninstall() {
     CloseServiceHandle(sc_manager);
 }
 
-static void set_status(unsigned long state) {
+void set_status(unsigned long state) {
     SERVICE_STATUS status;
 
     memset(&status, 0, sizeof(status));
@@ -201,12 +321,13 @@ static void set_status(unsigned long state) {
         throw last_error("SetServiceStatus", GetLastError());
 }
 
-static unsigned long handler_func(unsigned long control, unsigned long event_type, void* event_data, void* context) {
+static unsigned long handler_func(unsigned long control, unsigned long, void*, void*) {
     switch (control) {
         case SERVICE_CONTROL_STOP:
         case SERVICE_CONTROL_SHUTDOWN:
         {
-            // FIXME - stop
+            if (wsserv)
+                wsserv->close();
 
             set_status(SERVICE_STOPPED);
 
@@ -229,10 +350,12 @@ void service() {
 
         set_status(SERVICE_START_PENDING);
 
-        throw runtime_error("FIXME - get server and port from Registry");
-        // FIXME - get server and port
-        // FIXME - call init
-        // FIXME - call set_status(SERVICE_STARTED);
+        hkey k(HKEY_LOCAL_MACHINE, "SOFTWARE\\TDSweb", KEY_QUERY_VALUE);
+
+        auto server = k.query_string_value("Server");
+        auto port = k.query_dword_value("Port");
+
+        init(server, (uint16_t)port, true);
     } catch (const exception& e) {
         event_log(e.what(), EVENTLOG_ERROR_TYPE);
         throw;
