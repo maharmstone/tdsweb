@@ -17,6 +17,9 @@
 
 #ifdef _WIN32
 #include <windows.h>
+
+#define SERVICE_NAME L"TDSweb"
+
 #endif
 
 using namespace std;
@@ -471,13 +474,58 @@ static void service_install() {
         throw last_error("OpenSCManager", GetLastError());
 
     try {
-        auto service = CreateServiceW(sc_manager, L"TDSweb", L"TDSweb", SERVICE_QUERY_STATUS,
+        auto service = CreateServiceW(sc_manager, SERVICE_NAME, L"TDSweb", SERVICE_QUERY_STATUS,
                                       SERVICE_WIN32_OWN_PROCESS, SERVICE_DEMAND_START, SERVICE_ERROR_NORMAL,
                                       pathw.c_str(), nullptr, nullptr, nullptr, nullptr, nullptr);
 
         if (!sc_manager) {
             CloseServiceHandle(service);
             throw last_error("CreateService", GetLastError());
+        }
+
+        CloseServiceHandle(service);
+    } catch (...) {
+        CloseServiceHandle(sc_manager);
+        throw;
+    }
+
+    CloseServiceHandle(sc_manager);
+}
+
+static void service_uninstall() {
+    SC_HANDLE sc_manager;
+
+    sc_manager = OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT);
+    if (!sc_manager)
+        throw last_error("OpenSCManager", GetLastError());
+
+    try {
+        auto service = OpenServiceW(sc_manager, SERVICE_NAME, SERVICE_STOP | SERVICE_QUERY_STATUS | DELETE);
+        if (!service)
+            throw last_error("OpenService", GetLastError());
+
+        try {
+            SERVICE_STATUS status = {};
+
+            if (ControlService(service, SERVICE_CONTROL_STOP, &status)) {
+                Sleep(1000);
+
+                while (QueryServiceStatus(service, &status)) {
+                    if (status.dwCurrentState == SERVICE_STOP_PENDING)
+                        Sleep(1000);
+                    else
+                        break;
+                }
+
+                if (status.dwCurrentState != SERVICE_STOPPED)
+                    throw runtime_error("Service failed to stop.");
+            }
+
+            if (!DeleteService(service))
+                throw last_error("DeleteService", GetLastError());
+        } catch (...) {
+            CloseServiceHandle(service);
+            throw;
         }
 
         CloseServiceHandle(service);
@@ -495,6 +543,9 @@ int main(int argc, char* argv[]) {
 #ifdef _WIN32
         if (argc == 2 && !strcmp(argv[1], "install")) {
             service_install();
+            return 0;
+        } else if (argc == 2 && !strcmp(argv[1], "uninstall")) {
+            service_uninstall();
             return 0;
         }
 #endif
