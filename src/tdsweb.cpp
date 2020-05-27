@@ -15,6 +15,10 @@
 #include <shared_mutex>
 #endif
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 using namespace std;
 using json = nlohmann::json;
 
@@ -387,8 +391,113 @@ static void init(const string& server, uint16_t port) {
     serv.start();
 }
 
+#ifdef _WIN32
+static __inline string utf16_to_utf8(const u16string_view& s) {
+    string ret;
+
+    if (s.empty())
+        return "";
+
+    auto len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)s.data(), s.length(), nullptr, 0,
+                                   nullptr, nullptr);
+
+    if (len == 0)
+        throw runtime_error("WideCharToMultiByte 1 failed.");
+
+    ret.resize(len);
+
+    len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)s.data(), s.length(), ret.data(), len,
+                              nullptr, nullptr);
+
+    if (len == 0)
+        throw runtime_error("WideCharToMultiByte 1 failed.");
+
+    return ret;
+}
+
+class last_error : public exception {
+public:
+    last_error(const string_view& function, int le) {
+        string nice_msg;
+
+        {
+            char16_t* fm;
+
+            if (FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr,
+                le, 0, reinterpret_cast<LPWSTR>(&fm), 0, nullptr)) {
+                try {
+                    u16string_view s = fm;
+
+                    while (!s.empty() && (s[s.length() - 1] == u'\r' || s[s.length() - 1] == u'\n')) {
+                        s.remove_suffix(1);
+                    }
+
+                    nice_msg = utf16_to_utf8(s);
+                } catch (...) {
+                    LocalFree(fm);
+                    throw;
+                }
+
+                LocalFree(fm);
+                }
+        }
+
+        msg = string(function) + " failed (error " + to_string(le) + (!nice_msg.empty() ? (", " + nice_msg) : "") + ").";
+    }
+
+    const char* what() const noexcept {
+        return msg.c_str();
+    }
+
+private:
+    string msg;
+};
+
+static void service_install() {
+    SC_HANDLE sc_manager;
+    wstring pathw;
+
+    {
+        WCHAR path[MAX_PATH];
+
+        if (GetModuleFileNameW(nullptr, path, sizeof(path) / sizeof(WCHAR)) == 0)
+            throw last_error("GetModuleFileName", GetLastError());
+
+        pathw = L"\""s + path + L"\" service"s;
+    }
+
+    sc_manager = OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT | SC_MANAGER_CREATE_SERVICE);
+    if (!sc_manager)
+        throw last_error("OpenSCManager", GetLastError());
+
+    try {
+        auto service = CreateServiceW(sc_manager, L"TDSweb", L"TDSweb", SERVICE_QUERY_STATUS,
+                                      SERVICE_WIN32_OWN_PROCESS, SERVICE_DEMAND_START, SERVICE_ERROR_NORMAL,
+                                      pathw.c_str(), nullptr, nullptr, nullptr, nullptr, nullptr);
+
+        if (!sc_manager) {
+            CloseServiceHandle(service);
+            throw last_error("CreateService", GetLastError());
+        }
+
+        CloseServiceHandle(service);
+    } catch (...) {
+        CloseServiceHandle(sc_manager);
+        throw;
+    }
+
+    CloseServiceHandle(sc_manager);
+}
+#endif
+
 int main(int argc, char* argv[]) {
     try {
+#ifdef _WIN32
+        if (argc == 2 && !strcmp(argv[1], "install")) {
+            service_install();
+            return 0;
+        }
+#endif
         if (argc < 3) {
             fprintf(stderr, "Usage: tdsweb server port\n");
             return 1;
