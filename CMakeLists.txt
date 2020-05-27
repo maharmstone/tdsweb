@@ -11,7 +11,8 @@ find_package(tdscpp REQUIRED)
 find_package(wscpp REQUIRED)
 find_package(xlcpp REQUIRED)
 
-set(SRC_FILES src/tdsweb.cpp)
+set(SRC_FILES src/tdsweb.cpp
+    src/win.cpp)
 
 add_executable(tdsweb ${SRC_FILES})
 set_property(TARGET tdsweb PROPERTY

@@ -15,18 +15,18 @@
 #include <shared_mutex>
 #endif
 
-#ifdef _WIN32
-#include <windows.h>
-
-#define SERVICE_NAME L"TDSweb"
-
-#endif
-
 using namespace std;
 using json = nlohmann::json;
 
 static const string DB_APP = "tdsweb";
 static const unsigned int BACKLOG = 10;
+
+#ifdef _WIN32
+// in win.cpp
+void service_install();
+void service_uninstall();
+void service();
+#endif
 
 static void send_error(ws::client_thread& ct, const string& msg) {
     json j;
@@ -386,7 +386,7 @@ static void disconn_handler(ws::client_thread& ct) {
     }
 }
 
-static void init(const string& server, uint16_t port) {
+static void init(const string& server, uint16_t port, bool service = false) {
     ws::server serv(port, BACKLOG, ws_recv, [&](ws::client_thread& ct) {
         ct.context = new client(ct, server);
     }, disconn_handler);
@@ -394,159 +394,20 @@ static void init(const string& server, uint16_t port) {
     serv.start();
 }
 
-#ifdef _WIN32
-static __inline string utf16_to_utf8(const u16string_view& s) {
-    string ret;
-
-    if (s.empty())
-        return "";
-
-    auto len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)s.data(), s.length(), nullptr, 0,
-                                   nullptr, nullptr);
-
-    if (len == 0)
-        throw runtime_error("WideCharToMultiByte 1 failed.");
-
-    ret.resize(len);
-
-    len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)s.data(), s.length(), ret.data(), len,
-                              nullptr, nullptr);
-
-    if (len == 0)
-        throw runtime_error("WideCharToMultiByte 1 failed.");
-
-    return ret;
-}
-
-class last_error : public exception {
-public:
-    last_error(const string_view& function, int le) {
-        string nice_msg;
-
-        {
-            char16_t* fm;
-
-            if (FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr,
-                le, 0, reinterpret_cast<LPWSTR>(&fm), 0, nullptr)) {
-                try {
-                    u16string_view s = fm;
-
-                    while (!s.empty() && (s[s.length() - 1] == u'\r' || s[s.length() - 1] == u'\n')) {
-                        s.remove_suffix(1);
-                    }
-
-                    nice_msg = utf16_to_utf8(s);
-                } catch (...) {
-                    LocalFree(fm);
-                    throw;
-                }
-
-                LocalFree(fm);
-                }
-        }
-
-        msg = string(function) + " failed (error " + to_string(le) + (!nice_msg.empty() ? (", " + nice_msg) : "") + ").";
-    }
-
-    const char* what() const noexcept {
-        return msg.c_str();
-    }
-
-private:
-    string msg;
-};
-
-static void service_install() {
-    SC_HANDLE sc_manager;
-    wstring pathw;
-
-    {
-        WCHAR path[MAX_PATH];
-
-        if (GetModuleFileNameW(nullptr, path, sizeof(path) / sizeof(WCHAR)) == 0)
-            throw last_error("GetModuleFileName", GetLastError());
-
-        pathw = L"\""s + path + L"\" service"s;
-    }
-
-    sc_manager = OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT | SC_MANAGER_CREATE_SERVICE);
-    if (!sc_manager)
-        throw last_error("OpenSCManager", GetLastError());
-
-    try {
-        auto service = CreateServiceW(sc_manager, SERVICE_NAME, L"TDSweb", SERVICE_QUERY_STATUS,
-                                      SERVICE_WIN32_OWN_PROCESS, SERVICE_DEMAND_START, SERVICE_ERROR_NORMAL,
-                                      pathw.c_str(), nullptr, nullptr, nullptr, nullptr, nullptr);
-
-        if (!sc_manager) {
-            CloseServiceHandle(service);
-            throw last_error("CreateService", GetLastError());
-        }
-
-        CloseServiceHandle(service);
-    } catch (...) {
-        CloseServiceHandle(sc_manager);
-        throw;
-    }
-
-    CloseServiceHandle(sc_manager);
-}
-
-static void service_uninstall() {
-    SC_HANDLE sc_manager;
-
-    sc_manager = OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT);
-    if (!sc_manager)
-        throw last_error("OpenSCManager", GetLastError());
-
-    try {
-        auto service = OpenServiceW(sc_manager, SERVICE_NAME, SERVICE_STOP | SERVICE_QUERY_STATUS | DELETE);
-        if (!service)
-            throw last_error("OpenService", GetLastError());
-
-        try {
-            SERVICE_STATUS status = {};
-
-            if (ControlService(service, SERVICE_CONTROL_STOP, &status)) {
-                Sleep(1000);
-
-                while (QueryServiceStatus(service, &status)) {
-                    if (status.dwCurrentState == SERVICE_STOP_PENDING)
-                        Sleep(1000);
-                    else
-                        break;
-                }
-
-                if (status.dwCurrentState != SERVICE_STOPPED)
-                    throw runtime_error("Service failed to stop.");
-            }
-
-            if (!DeleteService(service))
-                throw last_error("DeleteService", GetLastError());
-        } catch (...) {
-            CloseServiceHandle(service);
-            throw;
-        }
-
-        CloseServiceHandle(service);
-    } catch (...) {
-        CloseServiceHandle(sc_manager);
-        throw;
-    }
-
-    CloseServiceHandle(sc_manager);
-}
-#endif
-
 int main(int argc, char* argv[]) {
     try {
 #ifdef _WIN32
-        if (argc == 2 && !strcmp(argv[1], "install")) {
-            service_install();
-            return 0;
-        } else if (argc == 2 && !strcmp(argv[1], "uninstall")) {
-            service_uninstall();
-            return 0;
+        if (argc == 2) {
+            if (!strcmp(argv[1], "install")) {
+                service_install();
+                return 0;
+            } else if (!strcmp(argv[1], "uninstall")) {
+                service_uninstall();
+                return 0;
+            } else if (!strcmp(argv[1], "service")) {
+                service();
+                return 0;
+            }
         }
 #endif
         if (argc < 3) {
