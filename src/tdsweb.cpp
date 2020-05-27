@@ -2,11 +2,18 @@
 #include <wscpp.h>
 #include <string>
 #include <iostream>
-#include <thread>
 #include <stdint.h>
 #include <nlohmann/json.hpp>
 #include <xlcpp.h>
 #include "base64.h"
+
+#ifdef __MINGW32__
+#include "mingw.thread.h"
+#include "mingw.shared_mutex.h"
+#else
+#include <thread>
+#include <shared_mutex>
+#endif
 
 using namespace std;
 using json = nlohmann::json;
