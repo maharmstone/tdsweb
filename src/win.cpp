@@ -341,12 +341,12 @@ static unsigned long handler_func(unsigned long control, unsigned long, void*, v
     return ERROR_CALL_NOT_IMPLEMENTED;
 }
 
-void service() {
+static void service_proc(unsigned long, wchar_t**) {
     try {
         service_handle = RegisterServiceCtrlHandlerExW(SERVICE_NAME, handler_func, nullptr);
 
         if (!service_handle)
-            throw last_error("RegisterServiceCtrlHandler", GetLastError());
+            throw last_error("RegisterServiceCtrlHandlerEx", GetLastError());
 
         set_status(SERVICE_START_PENDING);
 
@@ -356,6 +356,24 @@ void service() {
         auto port = k.query_dword_value("Port");
 
         init(server, (uint16_t)port, true);
+
+        set_status(SERVICE_STOPPED);
+    } catch (const exception& e) {
+        event_log(e.what(), EVENTLOG_ERROR_TYPE);
+        set_status(SERVICE_STOPPED);
+        throw;
+    }
+}
+
+void service() {
+    try {
+        static const SERVICE_TABLE_ENTRYW service_table[] = {
+            { (LPWSTR)SERVICE_NAME, service_proc },
+            { nullptr, nullptr }
+        };
+
+        if (!StartServiceCtrlDispatcherW(service_table))
+            throw last_error("StartServiceControlDispatcher", GetLastError());
     } catch (const exception& e) {
         event_log(e.what(), EVENTLOG_ERROR_TYPE);
         throw;
