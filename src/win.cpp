@@ -140,8 +140,8 @@ uint32_t hkey::query_dword_value(const string_view& name) const {
     else if (ret != ERROR_SUCCESS)
         throw runtime_error("RegQueryValueExW returned error " + to_string(ret) + ".");
 
-    if (type != REG_SZ)
-        throw runtime_error("Registry value type was " + to_string(type) + ", not REG_SZ as expected.");
+    if (type != REG_DWORD)
+        throw runtime_error("Registry value type was " + to_string(type) + ", not REG_DWORD as expected.");
 
     return val;
 }
