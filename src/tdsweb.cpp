@@ -24,12 +24,13 @@ static const unsigned int BACKLOG = 10;
 unique_ptr<ws::server> wsserv;
 
 #ifdef _WIN32
-#include <winsvc.h>
 // in win.cpp
 void service_install();
 void service_uninstall();
 void service();
 void set_status(unsigned long state);
+
+#define SERVICE_RUNNING 0x00000004
 #endif
 
 static void send_error(ws::client_thread& ct, const string& msg) {
