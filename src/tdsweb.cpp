@@ -353,7 +353,7 @@ void client::ping() {
     }.dump());
 }
 
-static void ws_recv(ws::client_thread& ct, const string& msg) {
+static void ws_recv(ws::client_thread& ct, const string_view& msg) {
     try {
         json j = json::parse(msg);
 
