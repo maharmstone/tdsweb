@@ -45,14 +45,14 @@ static __inline u16string utf8_to_utf16(const string_view& s) {
     if (s.empty())
         return u"";
 
-    auto len = MultiByteToWideChar(CP_UTF8, 0, s.data(), s.length(), nullptr, 0);
+    auto len = MultiByteToWideChar(CP_UTF8, 0, s.data(), (int)s.length(), nullptr, 0);
 
     if (len == 0)
         throw runtime_error("MultiByteToWideChar 1 failed.");
 
     ret.resize(len);
 
-    len = MultiByteToWideChar(CP_UTF8, 0, s.data(), s.length(), (wchar_t*)ret.data(), len);
+    len = MultiByteToWideChar(CP_UTF8, 0, s.data(), (int)s.length(), (wchar_t*)ret.data(), len);
 
     if (len == 0)
         throw runtime_error("MultiByteToWideChar 2 failed.");
@@ -66,7 +66,7 @@ static __inline string utf16_to_utf8(const u16string_view& s) {
     if (s.empty())
         return "";
 
-    auto len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)s.data(), s.length(), nullptr, 0,
+    auto len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)s.data(), (int)s.length(), nullptr, 0,
                                    nullptr, nullptr);
 
     if (len == 0)
@@ -74,7 +74,7 @@ static __inline string utf16_to_utf8(const u16string_view& s) {
 
     ret.resize(len);
 
-    len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)s.data(), s.length(), ret.data(), len,
+    len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)s.data(), (int)s.length(), ret.data(), len,
                               nullptr, nullptr);
 
     if (len == 0)

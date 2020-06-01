@@ -436,7 +436,7 @@ int main(int argc, char* argv[]) {
         if (port > 0xffff)
             throw runtime_error("Port out of range.");
 
-        init(argv[1], port);
+        init(argv[1], (uint16_t)port);
     } catch (const exception& e) {
         cerr << e.what() << endl;
         return 1;
