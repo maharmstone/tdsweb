@@ -150,6 +150,9 @@ void client::query(const json& j) {
         sheet = &excel->add_sheet("Sheet1");
     }
 
+    // log query
+    tds->run("INSERT INTO master.dbo.query_log(query) VALUES(?)", (string)j.at("query"));
+
     query_thread = new thread([&](string q) {
         bool failed = false;
 
