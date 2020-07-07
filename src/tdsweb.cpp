@@ -151,7 +151,7 @@ void client::query(const json& j) {
     }
 
     // log query
-    tds->run("INSERT INTO master.dbo.query_log(query) VALUES(?)", (string)j.at("query"));
+    tds->run("SET NOCOUNT ON; INSERT INTO master.dbo.query_log(query) VALUES(?);", (string)j.at("query"));
 
     query_thread = new thread([&](string q) {
         bool failed = false;
