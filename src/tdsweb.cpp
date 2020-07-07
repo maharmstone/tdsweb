@@ -386,7 +386,7 @@ static void ws_recv(ws::client_thread& ct, const string_view& msg) {
     }
 }
 
-static void disconn_handler(ws::client_thread& ct) {
+static void disconn_handler(ws::client_thread& ct, const std::exception_ptr&) {
     if (ct.context) {
         auto c = (client*)ct.context;
 
