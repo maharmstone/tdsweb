@@ -371,5 +371,14 @@ function init() {
         database_changed();
     });
 
+    window.addEventListener("keydown", function(e) {
+        if (e.keyCode == 116) {
+            if (!document.getElementById("go-button").disabled)
+                go_button_clicked(false);
+
+            e.preventDefault();
+        }
+    });
+
     init_websocket();
 }
